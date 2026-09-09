@@ -732,7 +732,11 @@ footer{
   </div>
   <div class="nav-right">
     <span class="credit-pill tabular" id="nav-credit-balance">48 credits</span>
-    <a class="btn btn-primary btn-sm" data-view="login" href="#login">Log in</a>
+    <a class="btn btn-primary btn-sm" data-view="login" href="#login" id="nav-login-btn">Log in</a>
+    <div id="nav-account" style="display:none;align-items:center;gap:10px;">
+      <span id="nav-user-email" class="tabular" style="font-size:.82rem;color:var(--text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <button class="btn btn-bordered btn-sm" id="nav-signout-btn" type="button">Sign out</button>
+    </div>
     <button class="hamburger" id="hamburger-btn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
   </div>
 </nav>
@@ -1089,6 +1093,8 @@ footer{
         <button type="submit" class="ld-submit" id="login-submit-btn">Sign in</button>
         <div id="auth-status" role="status" aria-live="polite" class="ld-status"></div>
       </form>
+      <div class="ld-divider">or</div>
+      <button type="button" class="ld-google" id="login-google-btn"><span class="google-dot" aria-hidden="true"></span>Continue with Google</button>
       <p class="ld-switch">New to Grove? <a href="#signup" data-view="signup">Create an account</a></p>
     </div>
   </div>
@@ -1124,6 +1130,8 @@ footer{
         <button type="submit" class="ld-submit" id="signup-submit-btn">Create account</button>
         <div id="signup-status" role="status" aria-live="polite" class="ld-status"></div>
       </form>
+      <div class="ld-divider">or</div>
+      <button type="button" class="ld-google" id="signup-google-btn"><span class="google-dot" aria-hidden="true"></span>Continue with Google</button>
       <p class="ld-switch">Already have an account? <a href="#login" data-view="login">Sign in</a></p>
     </div>
   </div>
@@ -1159,27 +1167,29 @@ footer{
 <!--
   REAL AUTH SETUP (Email + Password)
   ----------------------------------------------------------------
-  This is genuine Firebase code, wired to your project (grove-bde91).
+  Genuine Firebase code, wired to your project (grove-92fc7).
   Make sure Email/Password is switched on under
   Firebase Console > Build > Authentication > Sign-in method — the
   config below only connects the project, it doesn't turn on the
-  providers by itself.
+  provider by itself. If sign-in still fails after this, that
+  toggle is the first thing to check.
 -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
   import {
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyBTmzrbZYRBWPETGXOTbhCPGyoiKQ3_viE",
-    authDomain: "grove-bde91.firebaseapp.com",
-    projectId: "grove-bde91",
-    storageBucket: "grove-bde91.firebasestorage.app",
-    messagingSenderId: "973627462173",
-    appId: "1:973627462173:web:8bf7519dd85e1229ca2cf4",
-    measurementId: "G-RVYQSR0NHR"
+    apiKey: "AIzaSyA7_yCPKLEXTOA_bwcEkC36jfXTPGN9QAs",
+    authDomain: "grove-92fc7.firebaseapp.com",
+    projectId: "grove-92fc7",
+    storageBucket: "grove-92fc7.firebasestorage.app",
+    messagingSenderId: "877173768883",
+    appId: "1:877173768883:web:f7fa91d0bc5c4bfac2e6c6",
+    measurementId: "G-EH655T18T0"
   };
 
   let ready = false, auth = null;
@@ -1192,6 +1202,13 @@ footer{
     console.warn("Firebase did not initialize:", err);
   }
 
+  if(ready){
+    onAuthStateChanged(auth, (user)=>{
+      window.__groveUser = user;
+      window.dispatchEvent(new CustomEvent('grove-auth-changed', { detail:{ user } }));
+    });
+  }
+
   window.__groveAuth = {
     ready,
     async emailSignIn(email, password){
@@ -1199,7 +1216,7 @@ footer{
         await signInWithEmailAndPassword(auth, email, password);
         return { ok:true };
       } catch(e){
-        return { ok:false, message:e.message };
+        return { ok:false, message:friendlyAuthError(e) };
       }
     },
     async emailSignUp(email, password){
@@ -1207,10 +1224,43 @@ footer{
         await createUserWithEmailAndPassword(auth, email, password);
         return { ok:true, created:true };
       } catch(e){
-        return { ok:false, message:e.message };
+        return { ok:false, message:friendlyAuthError(e) };
+      }
+    },
+    async signOut(){
+      try { await signOut(auth); return { ok:true }; }
+      catch(e){ return { ok:false, message:e.message }; }
+    },
+    async signInWithGoogle(){
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+        return { ok:true };
+      } catch(e){
+        return { ok:false, message:friendlyAuthError(e) };
       }
     }
   };
+
+  function friendlyAuthError(e){
+    const code = e && e.code ? e.code : '';
+    const map = {
+      'auth/invalid-email':'That email address doesn\u2019t look right.',
+      'auth/missing-password':'Enter a password.',
+      'auth/weak-password':'Password should be at least 6 characters.',
+      'auth/email-already-in-use':'An account already exists for that email — try signing in instead.',
+      'auth/invalid-credential':'Incorrect email or password.',
+      'auth/wrong-password':'Incorrect email or password.',
+      'auth/user-not-found':'No account found for that email.',
+      'auth/too-many-requests':'Too many attempts — wait a moment and try again.',
+      'auth/network-request-failed':'Network error — check your connection and try again.',
+      'auth/operation-not-allowed':'Email/Password sign-in isn\u2019t enabled for this project yet in the Firebase console.',
+      'auth/popup-closed-by-user':'Sign-in window was closed before finishing.',
+      'auth/cancelled-popup-request':'Only one sign-in window can be open at a time.',
+      'auth/popup-blocked':'Your browser blocked the sign-in popup. Allow popups and try again.'
+    };
+    return map[code] || (e && e.message ? e.message : 'Something went wrong.');
+  }
 </script>
 
 <script>
@@ -1867,6 +1917,31 @@ function authNotConfiguredMessage(targetId='auth-status'){
   if(status) status.textContent = 'Firebase is not connected yet — check the setup in the page source.';
 }
 
+function updateAuthUI(user){
+  const loginBtn = document.getElementById('nav-login-btn');
+  const account = document.getElementById('nav-account');
+  const emailEl = document.getElementById('nav-user-email');
+  if(user){
+    loginBtn.style.display = 'none';
+    account.style.display = 'inline-flex';
+    emailEl.textContent = user.email || '';
+  } else {
+    loginBtn.style.display = 'inline-flex';
+    account.style.display = 'none';
+  }
+}
+// Catch a state change that may already have fired before this listener attached.
+if(window.__groveUser !== undefined) updateAuthUI(window.__groveUser);
+window.addEventListener('grove-auth-changed', e => updateAuthUI(e.detail.user));
+
+document.getElementById('nav-signout-btn').addEventListener('click', async function(){
+  const g = window.__groveAuth;
+  if(!g || !g.ready) return;
+  await g.signOut();
+  showToast('Signed out.');
+  showView('home');
+});
+
 document.getElementById('login-form').addEventListener('submit', async function(e){
   e.preventDefault();
   const g = window.__groveAuth;
@@ -1885,6 +1960,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
   if(result.ok){
     showToast('Signed in successfully.');
     document.getElementById('auth-status').textContent = '';
+    this.reset();
+    setTimeout(()=> showView('dashboard'), 400);
   } else {
     showToast(result.message || 'Unable to sign in.');
     document.getElementById('auth-status').textContent = result.message || 'Unable to sign in.';
@@ -1917,12 +1994,35 @@ document.getElementById('signup-form').addEventListener('submit', async function
   if(result.ok){
     status.textContent = '';
     showToast('Account created. Welcome to Grove.');
-    setTimeout(()=> showView('home'), 500);
+    this.reset();
+    setTimeout(()=> showView('dashboard'), 500);
   } else {
     status.textContent = result.message || 'Unable to create account.';
     showToast(result.message || 'Unable to create account.');
   }
 });
+
+async function handleGoogleClick(btn, statusId){
+  const g = window.__groveAuth;
+  if(!g || !g.ready){ authNotConfiguredMessage(statusId); return; }
+  const status = document.getElementById(statusId);
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" aria-hidden="true" style="border-color:rgba(0,0,0,0.2);border-top-color:#111;"></span>Connecting…';
+  const result = await g.signInWithGoogle();
+  btn.disabled = false;
+  btn.innerHTML = original;
+  if(result.ok){
+    showToast('Signed in with Google.');
+    if(status) status.textContent = '';
+    setTimeout(()=> showView('dashboard'), 400);
+  } else {
+    showToast(result.message || 'Unable to sign in with Google.');
+    if(status) status.textContent = result.message || 'Unable to sign in with Google.';
+  }
+}
+document.getElementById('login-google-btn').addEventListener('click', function(){ handleGoogleClick(this, 'auth-status'); });
+document.getElementById('signup-google-btn').addEventListener('click', function(){ handleGoogleClick(this, 'signup-status'); });
 
 // ---------------- Nav link wiring (for dynamically inserted links) ----------------
 function wireNavLinks(container){
