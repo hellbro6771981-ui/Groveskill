@@ -1069,7 +1069,9 @@ footer{
     <div class="explore-canvas-wrap">
       <canvas id="explore-tree-canvas" role="img" aria-label="Interactive 3D diagram of all skills, grouped by category"></canvas>
     </div>
-    <div class="legend" id="tree-legend-2" style="padding:24px 4px 60px;color:var(--text-secondary);"></div>
+    <div class="legend" id="tree-legend-2" style="padding:24px 4px 40px;color:var(--text-secondary);"></div>
+    <h3 class="section-heading" style="font-size:1.8rem;text-align:left;margin:20px 0 24px;">Skills matching your filters</h3>
+    <div class="skills-grid" id="explore-skills-grid" style="margin-bottom:60px;"></div>
     <ul class="sr-only" id="explore-sr-list" aria-label="List of skills, for screen readers"></ul>
   </div>
 </section>
@@ -1700,6 +1702,15 @@ function renderExploreSRList(){
   ).join('');
   ul.querySelectorAll('.sr-skill-btn').forEach(btn=> btn.addEventListener('click', ()=> openModal(Number(btn.dataset.id))));
 }
+function renderExploreGrid(){
+  const grid = document.getElementById('explore-skills-grid');
+  if(!grid) return;
+  const visible = SKILLS.filter(matchesFilter);
+  grid.innerHTML = visible.length
+    ? visible.map(skillCardHTML).join('')
+    : '<p style="grid-column:1/-1;color:var(--text-secondary);font-size:.95rem;">Nothing matches those filters yet.</p>';
+  wireSkillCards(grid);
+}
 document.querySelectorAll('.filter-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
@@ -1707,12 +1718,14 @@ document.querySelectorAll('.filter-chip').forEach(chip=>{
     activeCategory = chip.dataset.category;
     if(exploreGrove) exploreGrove.setActive(matchesFilter);
     renderExploreSRList();
+    renderExploreGrid();
   });
 });
 document.getElementById('search-input').addEventListener('input', (e)=>{
   searchQuery = e.target.value;
   if(exploreGrove) exploreGrove.setActive(matchesFilter);
   renderExploreSRList();
+  renderExploreGrid();
 });
 
 // ---------------- Scroll helpers ----------------
@@ -1910,6 +1923,7 @@ function initExploreTree(){
   } else {
     exploreGrove.setActive(matchesFilter);
   }
+  renderExploreGrid();
 }
 function initMyTree(){
   const c = document.getElementById('my-tree-canvas');
@@ -2035,6 +2049,7 @@ document.getElementById('teach-form').addEventListener('submit', function(e){
   renderFeatured();
   renderCounts();
   renderExploreSRList();
+  renderExploreGrid();
   renderDashboard();
   if(exploreGrove){ exploreGrove.rebuild(SKILLS); exploreGrove.setActive(matchesFilter); }
   showToast('\u201C'+title+'\u201D now has a branch in the grove.');
@@ -2246,6 +2261,7 @@ document.addEventListener('DOMContentLoaded', function(){
   renderCredits();
   renderCounts();
   renderExploreSRList();
+  renderExploreGrid();
   renderDashboard();
   renderProfileReviews();
   initShHero();
